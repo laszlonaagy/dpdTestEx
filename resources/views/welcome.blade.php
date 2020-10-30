@@ -113,7 +113,7 @@
         {
             e.preventDefault();
 
-
+                // validate the latitude and longitude values with regex
                 let latReg = new RegExp('^(\\+|-)?(?:90(?:(?:\\.0{1,6})?)|(?:[0-9]|[1-8][0-9])(?:(?:\\.[0-9]{1,6})?))$');
                 let longReg = new RegExp('^(\\+|-)?(?:180(?:(?:\\.0{1,6})?)|(?:[0-9]|[1-9][0-9]|1[0-7][0-9])(?:(?:\\.[0-9]{1,6})?))$');
 
@@ -122,6 +122,7 @@
                 let latitudeB = latReg.test($("input[name=latitude-b]").val()) ? $("input[name=latitude-b]").val() : false;
                 let longitudeB = longReg.test($("input[name=longitude-b]").val()) ? $("input[name=longitude-b]").val() : false;
 
+                // if validation was success and it is a real rectangle
                 if ((latitudeA != false && longitudeA != false && latitudeB != false && longitudeB != false) && (latitudeA != latitudeB && longitudeA != longitudeB))
                 {
 
@@ -134,7 +135,8 @@
                             latB:latitudeB,
                             longB:longitudeB,
                         },
-                        success:function(data){
+                        success:function(data)
+                        {
                             console.log(data);
                             $('#point-c').html('Latitude C: ' + data['latitudeC'] + ', Longitude C: ' + data['longitudeC']);
                             $('#point-d').html('Latitude D: ' + data['latitudeD'] + ', Longitude D: ' + data['longitudeD']);
@@ -155,6 +157,7 @@
 
         });
 
+        // calculate the geographic distance in JS
         function measure(lat1, lon1, lat2, lon2)
         {
             var R = 6378.137;
@@ -168,6 +171,7 @@
             return d * 1000;
         }
 
+        // empty the result values fields
         function reLoad()
         {
             $('#point-c').empty();

@@ -12,7 +12,9 @@ class WelcomeController extends Controller
     {
         $input = $request->all();
 
+        // creating a rectangle object and assign values to its properties
         $coordRect = new RectangleModel();
+
         $coordRect->latA = $input['latA'];
         $coordRect->longA = $input['longA'];
         $coordRect->latB = $input['latB'];
@@ -33,59 +35,57 @@ class WelcomeController extends Controller
         //      D  --------------------------- B
         //
 
+        // calculate A-C and A-D distance and perimeter (not in meter)
           $AC =  sqrt(pow(($coordRect->latC - $coordRect->latA),2) + pow(($coordRect->longC - $coordRect->longA),2));
           $AD =  sqrt(pow(($coordRect->latD - $coordRect->latA),2) + pow(($coordRect->longD - $coordRect->longA),2));
           $perimeter = ($AD + $AC) * 2;
 
+        // load data from csv file
+        $csvFileName = "price_specification.csv";
+        $csvFile = resource_path('data/' . $csvFileName);
+        $prices = $this->readCSV($csvFile,array('delimiter' => ','));
 
-        $sarok = [
-            'elem' => 'sarok',
-            'meret' => 0.5,
-            'koltseg' => 400
-        ];
+        // assign data from csv file to variables
+        $sarok = $prices[1];
+        $oszlop = $prices[2];
+        $drot = $prices[3];
+        $kapu = $prices[4];
 
-        $oszlop = [
-            'elem' => 'oszlop',
-            'meret' => 0.2,
-            'koltseg' => 100
-        ];
 
-        $drot = [
-            'elem' => 'drot',
-            'meret' => 2,
-            'koltseg' => 50
-        ];
 
-        $kapu = [
-            'elem' => 'kapu',
-            'meret' => 5,
-            'koltseg' => 1000
-        ];
+        // data structure of a record
+        // $sarok = [ 0 : "sarok",  // nev
+        //            1 : "0,5",    // meret(m)
+        //            2 : "400"     // koltseg (eur)
+        //           ]
 
+        // Calculate AC and AD distance in meter
         $ACInMeter = $this->calculateDistanceInMeter($coordRect->latA,$coordRect->longA,$coordRect->latC,$coordRect->longC,6371000);
         $ADInMeter = $this->calculateDistanceInMeter($coordRect->latA,$coordRect->longA,$coordRect->latD,$coordRect->longD,6371000);
 
-        $basePrice = $sarok['koltseg'] * 4 + $kapu['koltseg'] * 4 + $oszlop['koltseg'] * 8;
-        $wireLeft = [];
-        $ACSideDistance = ceil((($ACInMeter - ($sarok['meret'] * 2 + $kapu['meret'] + $oszlop['meret'] *2))/2) / ($drot['meret'] + $oszlop['meret']));
-        array_push($wireLeft,fmod((($ACInMeter - $sarok['meret'] * 2 - $kapu['meret'] - $oszlop['meret'] *2)/2) / ($drot['meret'] + $oszlop['meret']) , 1));
-        if ($wireLeft[0] > ($drot['meret'] + $oszlop['meret'] / 2))
+        // Calculate default cost
+        $basePrice = $sarok[2] * 4 + $kapu[2] * 4 + $oszlop[2] * 8;
+
+        // Calculate AC - Distance cost
+        $ACSideDistance = ceil((($ACInMeter - ($sarok[1] * 2 + $kapu[1] + $oszlop[1] *2))/2) / ($drot[1] + $oszlop[1]));
+
+        // If wire left from one AC side and it is longer than a unit (drot meret + oszlop meret) it can be used on DB side
+        $wireLeft = fmod((($ACInMeter - $sarok[1] * 2 - $kapu[1] - $oszlop[1] *2)/2) / ($drot[1] + $oszlop[1]) , 1);
+        if ($wireLeft > ($drot[1] + $oszlop[1] / 2))
         {
             $ACSideDistance += $ACSideDistance -1;
         }
-        unset($wireLeft); // remove from symbol table
 
-        $wireLeft = array();
 
-        $ADSideDistance = ceil((($ADInMeter - ($sarok['meret'] * 2 + $kapu['meret'] + $oszlop['meret'] *2))/2) / ($drot['meret'] + $oszlop['meret']));
-        array_push($wireLeft,fmod((($ADInMeter - $sarok['meret'] * 2 - $kapu['meret'] - $oszlop['meret'] *2)/2) / ($drot['meret'] + $oszlop['meret']) , 1));
-        if ($wireLeft[0] > ($drot['meret'] + $oszlop['meret'] / 2))
+        $ADSideDistance = ceil((($ADInMeter - ($sarok[1] * 2 + $kapu[1] + $oszlop[1] *2))/2) / ($drot[1] + $oszlop[1]));
+        $wireLeft = fmod((($ADInMeter - $sarok[1] * 2 - $kapu[1] - $oszlop[1] *2)/2) / ($drot[1] + $oszlop[1]) , 1);
+        if ($wireLeft > ($drot[1] + $oszlop[1] / 2))
         {
             $ADSideDistance += $ADSideDistance -1;
         }
-        unset($wireLeft); // remove from symbol table
 
-        $totalPrice = $basePrice + ($ACSideDistance + $ADSideDistance) * ($oszlop['koltseg'] + $drot['koltseg']) * 4;
+        // Calculate the total price
+        $totalPrice = $basePrice + ($ACSideDistance + $ADSideDistance) * ($oszlop[2] + $drot[2]) * 4;
 
         return response()->json(['latitudeC' => $coordRect->latC,
             'longitudeC' => $coordRect->longC,
@@ -93,11 +93,12 @@ class WelcomeController extends Controller
             'latitudeD'=>$coordRect->latD,
             'perimeter'=>$perimeter,
             'totalPrice' => $totalPrice,
+            'prices' => $prices
             ]);
 
 
 }
-
+    // Calculate the geographic distance in meter
     public function calculateDistanceInMeter(
         $latitudeFrom, $longitudeFrom, $latitudeTo, $longitudeTo, $earthRadius)
     {
@@ -113,6 +114,18 @@ class WelcomeController extends Controller
         $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) +
                 cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
         return $angle * $earthRadius;
+    }
+
+    // read data from CSV file
+    public function readCSV($csvFile, $array)
+    {
+        $file_handle = fopen($csvFile, 'r');
+        while (!feof($file_handle))
+        {
+            $line_of_text[] = fgetcsv($file_handle, 0, $array['delimiter']);
+        }
+        fclose($file_handle);
+        return $line_of_text;
     }
 
 }
